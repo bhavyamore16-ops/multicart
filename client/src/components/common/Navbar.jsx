@@ -1,13 +1,16 @@
 import React, { useState } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
-import { ShoppingCart, Store, User, Menu, X, Search, ShieldCheck, LogOut, ChevronDown } from 'lucide-react';
+import { ShoppingCart, Store, User, Menu, X, Search, ShieldCheck, LogOut, ChevronDown, Heart } from 'lucide-react';
 import { useCart } from '../../context/CartContext';
 import { useAuth } from '../../context/AuthContext';
+import { useWishlist } from '../../context/WishlistContext';
+import NotificationCenter from './NotificationCenter';
 
 const Navbar = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
   const { totalItemsCount, subtotal } = useCart();
+  const { wishlistItems } = useWishlist();
   const { user, isAuthenticated, logout } = useAuth();
   const navigate = useNavigate();
 
@@ -76,6 +79,13 @@ const Navbar = () => {
 
           {/* Right Section: Cart & Authentication */}
           <div className="flex items-center gap-3">
+
+            {isAuthenticated && <NotificationCenter />}
+
+            <Link to="/wishlist" className="relative p-2.5 text-slate-700 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors" title="Wishlist" aria-label="Wishlist">
+              <Heart className="w-5 h-5" />
+              {wishlistItems.length > 0 && <span className="absolute -top-1 -right-1 bg-rose-600 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center ring-2 ring-white">{wishlistItems.length}</span>}
+            </Link>
             
             {/* Cart Icon with Live Badge */}
             <Link
@@ -133,6 +143,13 @@ const Navbar = () => {
                     </div>
 
                     <div className="py-1">
+                      <Link
+                        to="/orders"
+                        onClick={() => setUserDropdownOpen(false)}
+                        className="block px-4 py-2 text-xs font-bold text-blue-700 hover:bg-blue-50 transition-colors"
+                      >
+                        {user.role === 'customer' ? 'My Orders' : 'Order Management'}
+                      </Link>
                       <Link
                         to="/profile"
                         onClick={() => setUserDropdownOpen(false)}

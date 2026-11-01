@@ -38,6 +38,10 @@ const productSchema = new mongoose.Schema({
     type: Number,
     required: [true, 'Stock quantity is required'],
     min: [0, 'Stock cannot be negative'],
+    validate: {
+      validator: Number.isInteger,
+      message: 'Stock quantity must be a whole number'
+    },
     default: 0
   },
   category: {

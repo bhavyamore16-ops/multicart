@@ -1,30 +1,39 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Star, ShoppingCart, Store, Check } from 'lucide-react';
+import { Star, ShoppingCart, Store, Check, Heart, Package } from 'lucide-react';
 import { useCart } from '../../context/CartContext';
+import { useWishlist } from '../../context/WishlistContext';
 
 const ProductCard = ({ product }) => {
   const { addToCart, cartItems } = useCart();
-  const isInCart = cartItems.some(item => item.id === product.id);
+  const { toggleWishlist, isWishlisted } = useWishlist();
+  const isInCart = cartItems.some(item => item.id === String(product.id || product._id));
+  const isSaved = isWishlisted(product.id || product._id);
+  const canBuy = product.isPurchasable !== false && product.isAvailable !== false && Number(product.stock) > 0;
 
   return (
     <div className="group bg-white rounded-2xl border border-slate-200 hover:border-blue-400 hover:shadow-xl transition-all duration-300 flex flex-col overflow-hidden relative">
       
       {/* Discount Badge */}
-      {product.discount && (
+      {product.discountPercent > 0 && (
         <span className="absolute top-3 left-3 z-10 bg-rose-600 text-white text-[11px] font-bold px-2.5 py-1 rounded-full shadow-md tracking-wider">
-          {product.discount}
+          {product.discountPercent}% OFF
         </span>
       )}
 
+      <button type="button" onClick={() => toggleWishlist(product)} aria-label={isSaved ? 'Remove from wishlist' : 'Add to wishlist'} title={isSaved ? 'Remove from wishlist' : 'Add to wishlist'}
+        className="absolute top-3 right-3 z-10 p-2 rounded-full bg-white/95 text-rose-600 shadow hover:bg-rose-50">
+        <Heart className={`w-4 h-4 ${isSaved ? 'fill-rose-500' : ''}`} />
+      </button>
+
       {/* Product Image with link */}
       <Link to={`/products/${product.slug || product.id}`} className="relative block aspect-square overflow-hidden bg-slate-100">
-        <img
+        {product.image ? <img
           src={product.image}
           alt={product.name}
           className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
           loading="lazy"
-        />
+        /> : <div className="w-full h-full flex items-center justify-center text-slate-300"><Package className="w-12 h-12" /></div>}
       </Link>
 
       {/* Content Area */}
@@ -52,7 +61,7 @@ const ProductCard = ({ product }) => {
             <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
             <span className="text-xs font-bold text-slate-800 ml-1">{product.rating}</span>
           </div>
-          <span className="text-xs text-slate-400">({product.reviewCount || 42})</span>
+          <span className="text-xs text-slate-400">({product.reviewCount || 0})</span>
         </div>
 
         {/* Price & Action Row */}
@@ -66,11 +75,15 @@ const ProductCard = ({ product }) => {
                 ₹{product.originalPrice.toLocaleString('en-IN')}
               </div>
             )}
+            <div className={`mt-1 text-[11px] font-semibold ${canBuy ? 'text-emerald-700' : 'text-rose-600'}`}>
+              {canBuy ? `${product.stock} in stock` : 'Unavailable'}
+            </div>
           </div>
 
           <button
             onClick={() => addToCart(product, 1)}
-            className={`p-2.5 sm:px-3.5 sm:py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm active:scale-95 ${
+            disabled={!canBuy}
+            className={`p-2.5 sm:px-3.5 sm:py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm active:scale-95 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none ${
               isInCart
                 ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
                 : 'bg-blue-600 hover:bg-blue-700 text-white shadow-blue-500/20'

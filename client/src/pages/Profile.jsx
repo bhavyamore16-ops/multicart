@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { User, Mail, Phone, MapPin, Lock, ShieldCheck, CheckCircle2, Save } from 'lucide-react';
+import { User, Mail, Phone, MapPin, Lock, ShieldCheck, CheckCircle2, Save, AlertCircle, LoaderCircle } from 'lucide-react';
 
 const Profile = () => {
   const { user, updateProfile, changePassword } = useAuth();
@@ -21,16 +21,23 @@ const Profile = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
 
   const [feedback, setFeedback] = useState(null);
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [savingPassword, setSavingPassword] = useState(false);
 
   const handleUpdateProfile = async (e) => {
     e.preventDefault();
-    const res = await updateProfile({
-      name,
-      phone,
-      address: { street, city, state, postalCode, country: 'India' }
-    });
-    setFeedback({ type: 'success', text: res.message || 'Profile updated successfully!' });
-    setTimeout(() => setFeedback(null), 3000);
+    setSavingProfile(true);
+    setFeedback(null);
+    try {
+      const res = await updateProfile({
+        name,
+        phone,
+        address: { street, city, state, postalCode, country: 'India' }
+      });
+      setFeedback({ type: res.success ? 'success' : 'error', text: res.message || (res.success ? 'Profile updated successfully!' : 'Profile update failed.') });
+    } catch (error) {
+      setFeedback({ type: 'error', text: error.message || 'Profile update failed.' });
+    } finally { setSavingProfile(false); }
   };
 
   const handleChangePassword = async (e) => {
@@ -44,12 +51,21 @@ const Profile = () => {
       return;
     }
 
-    const res = await changePassword(currentPassword, newPassword);
-    setFeedback({ type: 'success', text: res.message || 'Password changed successfully!' });
-    setCurrentPassword('');
-    setNewPassword('');
-    setConfirmPassword('');
-    setTimeout(() => setFeedback(null), 3000);
+    setSavingPassword(true);
+    setFeedback(null);
+    try {
+      const res = await changePassword(currentPassword, newPassword);
+      if (!res.success) {
+        setFeedback({ type: 'error', text: res.message || 'Password update failed.' });
+        return;
+      }
+      setFeedback({ type: 'success', text: res.message || 'Password changed successfully!' });
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch (error) {
+      setFeedback({ type: 'error', text: error.message || 'Password update failed.' });
+    } finally { setSavingPassword(false); }
   };
 
   if (!user) return null;
@@ -79,23 +95,23 @@ const Profile = () => {
             </span>
             <span className="flex items-center gap-1">
               <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-              Account Status: Active
+              Account Status: {user.isActive === false ? 'Inactive' : 'Active'}
             </span>
           </div>
         </div>
       </div>
 
       {feedback && (
-        <div className={`p-4 rounded-2xl mb-6 flex items-center gap-2 text-xs font-bold ${
+        <div role={feedback.type === 'error' ? 'alert' : 'status'} className={`p-4 rounded-2xl mb-6 flex items-center gap-2 text-xs font-bold ${
           feedback.type === 'success' ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-rose-50 text-rose-800 border border-rose-200'
         }`}>
-          <CheckCircle2 className="w-4 h-4 shrink-0" />
+          {feedback.type === 'success' ? <CheckCircle2 className="w-4 h-4 shrink-0" /> : <AlertCircle className="w-4 h-4 shrink-0" />}
           <span>{feedback.text}</span>
         </div>
       )}
 
       {/* Tabs */}
-      <div className="flex border-b border-slate-200 mb-8 gap-4">
+      <div className="flex border-b border-slate-200 mb-8 gap-4 overflow-x-auto">
         <button
           onClick={() => setActiveTab('details')}
           className={`pb-3 text-xs sm:text-sm font-bold border-b-2 transition-all ${
@@ -116,7 +132,7 @@ const Profile = () => {
 
       {/* Profile Form */}
       {activeTab === 'details' && (
-        <div className="bg-white rounded-3xl border border-slate-200 p-8 shadow-sm">
+        <div className="bg-white rounded-3xl border border-slate-200 p-5 sm:p-8 shadow-sm">
           <form onSubmit={handleUpdateProfile} className="space-y-6">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
@@ -166,7 +182,7 @@ const Profile = () => {
                   />
                 </div>
 
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1">City</label>
                     <input
@@ -203,10 +219,11 @@ const Profile = () => {
 
             <button
               type="submit"
+              disabled={savingProfile}
               className="py-3 px-6 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-md transition-all flex items-center gap-2"
             >
-              <Save className="w-4 h-4" />
-              <span>Save Profile Changes</span>
+              {savingProfile ? <LoaderCircle className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+              <span>{savingProfile ? 'Saving profile…' : 'Save Profile Changes'}</span>
             </button>
           </form>
         </div>
@@ -214,7 +231,7 @@ const Profile = () => {
 
       {/* Password Form */}
       {activeTab === 'password' && (
-        <div className="bg-white rounded-3xl border border-slate-200 p-8 shadow-sm max-w-lg">
+        <div className="bg-white rounded-3xl border border-slate-200 p-5 sm:p-8 shadow-sm max-w-lg">
           <form onSubmit={handleChangePassword} className="space-y-4">
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1.5">Current Password</label>
@@ -251,10 +268,11 @@ const Profile = () => {
 
             <button
               type="submit"
+              disabled={savingPassword}
               className="py-3 px-6 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-md transition-all flex items-center gap-2"
             >
-              <Lock className="w-4 h-4" />
-              <span>Update Password</span>
+              {savingPassword ? <LoaderCircle className="w-4 h-4 animate-spin" /> : <Lock className="w-4 h-4" />}
+              <span>{savingPassword ? 'Updating password…' : 'Update Password'}</span>
             </button>
           </form>
         </div>

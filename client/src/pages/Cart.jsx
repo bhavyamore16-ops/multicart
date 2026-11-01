@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ShoppingBag, Trash2, Plus, Minus, Store, ArrowRight, ShieldCheck, Truck, CheckCircle2 } from 'lucide-react';
+import { ShoppingBag, Trash2, Plus, Minus, Store, ArrowRight, ShieldCheck, Truck, AlertTriangle } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 
@@ -15,27 +15,39 @@ const Cart = () => {
     subtotal,
     totalDiscount,
     shippingFee,
-    grandTotal
+    grandTotal,
+    validateCart,
+    cartError,
+    isSyncing
   } = useCart();
 
   const { isAuthenticated, user } = useAuth();
-  const [checkoutModalOpen, setCheckoutModalOpen] = useState(false);
-  const [orderPlaced, setOrderPlaced] = useState(false);
   const navigate = useNavigate();
+  const [validating, setValidating] = useState(false);
+  const [availabilityError, setAvailabilityError] = useState('');
 
-  const handlePlaceOrder = () => {
-    setOrderPlaced(true);
-    setTimeout(() => {
-      clearCart();
-      setOrderPlaced(false);
-      setCheckoutModalOpen(false);
-      navigate('/');
-    }, 3500);
+  const handleValidateCart = async () => {
+    setValidating(true);
+    setAvailabilityError('');
+    try {
+      const result = await validateCart();
+      if (!result.success) {
+        setAvailabilityError(result.message || 'Some items are no longer available. Remove them or adjust their quantities.');
+        return;
+      }
+      navigate('/checkout');
+    } catch (error) {
+      setAvailabilityError(error.message || 'Unable to verify current product availability.');
+    } finally {
+      setValidating(false);
+    }
   };
 
   if (cartItems.length === 0) {
     return (
       <div className="max-w-3xl mx-auto px-4 py-20 text-center">
+        {cartError && <p role="alert" className="mb-5 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">{cartError} Refresh the page to retry.</p>}
+        {isSyncing && <p className="mb-5 text-sm text-slate-500">Loading your saved cart…</p>}
         <div className="w-24 h-24 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center mx-auto mb-6 shadow-inner">
           <ShoppingBag className="w-12 h-12" />
         </div>
@@ -56,6 +68,8 @@ const Cart = () => {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-16">
+      {cartError && <div role="alert" className="mb-6 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">{cartError} Refresh the page to retry loading your saved cart.</div>}
+      {availabilityError && <div role="alert" className="mb-6 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800"><AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />{availabilityError}</div>}
       
       {/* Title */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-6 mb-8 border-b border-slate-200 gap-4">
@@ -65,10 +79,11 @@ const Cart = () => {
             You have <strong className="text-slate-900">{totalItemsCount}</strong> items from{' '}
             <strong className="text-blue-600">{itemsByVendor.length}</strong> independent vendors.
           </p>
+          <p className="text-[11px] text-slate-500 mt-1">{isAuthenticated && user?.role === 'customer' ? 'Saved to your customer account.' : 'Guest cart is saved in this browser.'}</p>
         </div>
 
         <button
-          onClick={clearCart}
+          onClick={() => { if (window.confirm('Remove every item from your cart?')) clearCart(); }}
           className="text-xs font-semibold text-rose-600 hover:text-rose-700 flex items-center gap-1 self-start sm:self-auto"
         >
           <Trash2 className="w-4 h-4" />
@@ -127,6 +142,9 @@ const Cart = () => {
                       <div className="text-xs text-slate-500 mt-1">
                         Unit Price: <span className="font-bold text-slate-900">₹{item.price.toLocaleString('en-IN')}</span>
                       </div>
+                      <div className={`text-[11px] font-semibold mt-1 ${item.isAvailable === false ? 'text-rose-600' : 'text-emerald-700'}`}>
+                        {item.isAvailable === false ? `Unavailable · ${item.stock} in stock` : `${item.stock} available`}
+                      </div>
                     </div>
 
                     {/* Quantity Controls */}
@@ -141,6 +159,7 @@ const Cart = () => {
                       <span className="w-8 text-center text-xs font-bold text-slate-900">{item.quantity}</span>
                       <button
                         onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                        disabled={item.isAvailable === false || item.quantity >= item.stock}
                         className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-600"
                         title="Increase quantity"
                       >
@@ -201,10 +220,11 @@ const Cart = () => {
             </div>
 
             <button
-              onClick={() => setCheckoutModalOpen(true)}
+              onClick={handleValidateCart}
+              disabled={validating || isSyncing}
               className="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-2xl shadow-xl shadow-blue-500/20 hover:shadow-2xl transition-all flex items-center justify-center gap-2"
             >
-              <span>Proceed to Checkout</span>
+              <span>{validating ? 'Checking availability…' : 'Continue to checkout'}</span>
               <ArrowRight className="w-4 h-4" />
             </button>
 
@@ -215,68 +235,13 @@ const Cart = () => {
               </div>
               <div className="flex items-center gap-2">
                 <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
-                <span>Encrypted 256-bit checkout simulation</span>
+                <span>Availability is checked against current product stock</span>
               </div>
             </div>
           </div>
         </div>
 
       </div>
-
-      {/* Checkout Preview Modal */}
-      {checkoutModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-8 shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95">
-            {!orderPlaced ? (
-              <>
-                <h3 className="text-xl font-black text-slate-900 mb-2">Multi-Vendor Checkout Preview</h3>
-                <p className="text-xs text-slate-500 mb-6">
-                  One unified payment will be authorized. The backend split-order engine will automatically allocate orders to respective vendors.
-                </p>
-
-                <div className="space-y-3 bg-slate-50 p-4 rounded-2xl border border-slate-200 mb-6 text-xs">
-                  <div className="flex justify-between font-bold text-slate-800">
-                    <span>Vendors in this purchase:</span>
-                    <span className="text-blue-600">{itemsByVendor.map(v => v.vendorName).join(', ')}</span>
-                  </div>
-                  <div className="flex justify-between font-bold text-slate-800">
-                    <span>Payment Channel:</span>
-                    <span>Stripe Sandbox / COD</span>
-                  </div>
-                  <div className="flex justify-between font-bold text-slate-900 text-sm pt-2 border-t border-slate-200">
-                    <span>Amount Payable:</span>
-                    <span>₹{grandTotal.toLocaleString('en-IN')}</span>
-                  </div>
-                </div>
-
-                <div className="flex gap-3">
-                  <button
-                    onClick={() => setCheckoutModalOpen(false)}
-                    className="flex-1 py-3 border border-slate-300 rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-50"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handlePlaceOrder}
-                    className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-lg shadow-emerald-600/25"
-                  >
-                    Confirm &amp; Place Order
-                  </button>
-                </div>
-              </>
-            ) : (
-              <div className="text-center py-6">
-                <CheckCircle2 className="w-16 h-16 text-emerald-600 mx-auto mb-4 animate-bounce" />
-                <h3 className="text-2xl font-black text-slate-900 mb-2">Order Confirmed!</h3>
-                <p className="text-xs text-slate-600 max-w-xs mx-auto mb-4">
-                  Master Order #MC-2026-9812 created. Split orders dispatched to {itemsByVendor.length} vendors for fulfillment.
-                </p>
-                <div className="text-[11px] text-blue-600 font-semibold">Redirecting to Home...</div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
 
     </div>
   );

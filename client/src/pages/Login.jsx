@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { ShoppingCart, Lock, Mail, Store, Shield, ArrowRight, UserCheck } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
@@ -10,6 +10,13 @@ const Login = () => {
   const [errorMsg, setErrorMsg] = useState('');
   const { login, loading } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  const navigateAfterLogin = role => {
+    if (role === 'admin') navigate('/admin/dashboard');
+    else if (role === 'vendor') navigate('/vendor/dashboard');
+    else navigate(location.state?.from?.pathname || '/');
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -21,9 +28,7 @@ const Login = () => {
     const res = await login(email, password);
     if (res.success) {
       const role = res.data?.user?.role || selectedRole;
-      if (role === 'admin') navigate('/admin/dashboard');
-      else if (role === 'vendor') navigate('/vendor/dashboard');
-      else navigate('/');
+      navigateAfterLogin(role);
     } else {
       setErrorMsg(res.message || "Authentication failed. Please verify credentials.");
     }
@@ -35,9 +40,7 @@ const Login = () => {
     setPassword(demoPass);
     const res = await login(demoEmail, demoPass);
     if (res.success) {
-      if (role === 'admin') navigate('/admin/dashboard');
-      else if (role === 'vendor') navigate('/vendor/dashboard');
-      else navigate('/');
+      navigateAfterLogin(role);
     }
   };
 

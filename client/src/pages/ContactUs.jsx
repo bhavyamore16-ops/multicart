@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
-import { Mail, Phone, MapPin, Send, MessageSquare, ChevronDown, ChevronUp, CheckCircle2 } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Mail, Phone, MapPin, Send, MessageSquare, ChevronDown, ChevronUp, CheckCircle2, AlertCircle, LoaderCircle } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+import { contactAPI } from '../services/api';
 
 const FAQS = [
   {
@@ -8,7 +10,7 @@ const FAQS = [
   },
   {
     q: "How can I track my shipment from different sellers?",
-    a: "In your Order History page, every vendor slice displays its own fulfillment status (e.g. Vendor A: Shipped with Tracking Number, Vendor B: Processing). You will also receive email alerts when items are dispatched."
+    a: "In your Order History page, each vendor order displays its own fulfillment status and tracking number. Signed-in customers also receive in-app notifications when order status changes."
   },
   {
     q: "How do I become a verified seller on MultiCart?",
@@ -16,22 +18,50 @@ const FAQS = [
   },
   {
     q: "What payment methods are supported?",
-    a: "MultiCart supports Credit/Debit cards, UPI, and NetBanking via Stripe and Razorpay sandboxes, as well as Cash on Delivery (COD) for eligible regions."
+    a: "Cash on Delivery is available. Razorpay test mode provides online checkout when platform test credentials are configured. MultiCart does not store card or bank details."
   }
 ];
 
 const ContactUs = () => {
+  const { user } = useAuth();
   const [formData, setFormData] = useState({ name: '', email: '', subject: '', message: '' });
   const [submitted, setSubmitted] = useState(false);
   const [openFaq, setOpenFaq] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
+  const [myMessages, setMyMessages] = useState([]);
+  const [messagesLoading, setMessagesLoading] = useState(false);
+  const [messagesError, setMessagesError] = useState('');
 
-  const handleSubmit = (e) => {
+  useEffect(() => {
+    setFormData(current => ({ ...current, name: user?.name || '', email: user?.email || '' }));
+  }, [user?.name, user?.email]);
+
+  useEffect(() => {
+    setMyMessages([]);
+    setMessagesError('');
+    if (user?.role !== 'customer') return;
+    let active = true;
+    setMessagesLoading(true);
+    contactAPI.getMyMessages()
+      .then(result => { if (active) setMyMessages(result.messages || []); })
+      .catch(error => { if (active) setMessagesError(error.message || 'Your support history could not be loaded.'); })
+      .finally(() => { if (active) setMessagesLoading(false); });
+    return () => { active = false; };
+  }, [user?._id, user?.role]);
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    setSubmitted(true);
-    setTimeout(() => {
-      setSubmitted(false);
-      setFormData({ name: '', email: '', subject: '', message: '' });
-    }, 4000);
+    setSubmitting(true);
+    setSubmitError('');
+    try {
+      const result = await contactAPI.send(formData);
+      setSubmitted(true);
+      setFormData(current => ({ ...current, subject: '', message: '' }));
+      if (user?.role === 'customer') setMyMessages(current => [result.contactMessage, ...current]);
+    } catch (error) {
+      setSubmitError(error.message || 'Your message could not be sent. Please try again.');
+    } finally { setSubmitting(false); }
   };
 
   const toggleFaq = (index) => {
@@ -96,18 +126,20 @@ const ContactUs = () => {
 
         {/* Contact Form */}
         <div className="lg:col-span-7">
-          <div className="bg-white p-8 sm:p-10 rounded-3xl border border-slate-200 shadow-sm">
+          <div className="bg-white p-5 sm:p-10 rounded-3xl border border-slate-200 shadow-sm">
             <h3 className="text-xl font-black text-slate-900 mb-2">Send Us a Direct Message</h3>
             <p className="text-xs text-slate-500 mb-6">Fill in your information below and we will route your request.</p>
 
             {submitted ? (
               <div className="p-8 bg-emerald-50 border border-emerald-200 rounded-2xl text-center space-y-2">
                 <CheckCircle2 className="w-12 h-12 text-emerald-600 mx-auto" />
-                <h4 className="text-base font-bold text-emerald-900">Message Dispatched Successfully!</h4>
-                <p className="text-xs text-emerald-700">Thank you for reaching out. A support engineer will respond shortly.</p>
+                <h4 className="text-base font-bold text-emerald-900">Message sent to MultiCart Support</h4>
+                <p className="text-xs text-emerald-700">Thank you for reaching out. You can review responses in your support history when signed in.</p>
+                <button type="button" onClick={() => setSubmitted(false)} className="mt-3 rounded-xl bg-emerald-700 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-800">Send another message</button>
               </div>
             ) : (
               <form onSubmit={handleSubmit} className="space-y-4">
+                {submitError && <div role="alert" className="flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800"><AlertCircle size={17} className="mt-0.5 shrink-0" />{submitError}</div>}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1">Your Full Name</label>
@@ -159,10 +191,11 @@ const ContactUs = () => {
 
                 <button
                   type="submit"
-                  className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-lg shadow-blue-500/20 transition-all flex items-center justify-center gap-2"
+                  disabled={submitting}
+                  className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-lg shadow-blue-500/20 transition-all flex items-center justify-center gap-2 disabled:cursor-wait disabled:opacity-60"
                 >
-                  <Send className="w-4 h-4" />
-                  <span>Transmit Message</span>
+                  {submitting ? <LoaderCircle className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                  <span>{submitting ? 'Sending message…' : 'Send message'}</span>
                 </button>
               </form>
             )}
@@ -170,6 +203,12 @@ const ContactUs = () => {
         </div>
 
       </div>
+
+      {user?.role === 'customer' && <section className="max-w-4xl mx-auto mb-16 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-8">
+        <div className="mb-5 flex items-center gap-3"><span className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-700"><MessageSquare size={18} /></span><div><h2 className="text-lg font-black text-slate-900">Your support messages</h2><p className="text-xs text-slate-500">View support status and replies from the MultiCart team.</p></div></div>
+        {messagesError && <p role="alert" className="mb-4 rounded-xl bg-rose-50 p-3 text-sm text-rose-700">{messagesError}</p>}
+        {messagesLoading ? <div className="flex items-center gap-2 py-8 text-sm text-slate-500"><LoaderCircle size={16} className="animate-spin" />Loading support history…</div> : myMessages.length ? <div className="space-y-3">{myMessages.map(item => <article key={item._id} className="rounded-2xl border border-slate-100 bg-slate-50 p-4"><div className="flex flex-wrap items-center justify-between gap-2"><h3 className="font-bold text-slate-900">{item.subject}</h3><span className={`rounded-full px-2.5 py-1 text-[10px] font-bold capitalize ${item.status === 'resolved' ? 'bg-emerald-100 text-emerald-800' : item.status === 'new' ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800'}`}>{item.status?.replace('_', ' ')}</span></div><p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-600">{item.message}</p>{item.adminReply && <div className="mt-3 rounded-xl border-l-4 border-blue-500 bg-white p-3"><p className="text-[10px] font-black uppercase tracking-wide text-blue-700">Support reply</p><p className="mt-1 whitespace-pre-wrap text-sm text-slate-700">{item.adminReply}</p></div>}</article>)}</div> : <div className="rounded-2xl border border-dashed border-slate-200 py-8 text-center text-sm text-slate-500">You have not sent a support message yet.</div>}
+      </section>}
 
       {/* Frequently Asked Questions (FAQ) Accordion */}
       <div className="max-w-4xl mx-auto">

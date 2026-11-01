@@ -22,11 +22,11 @@ const HeroBanner = () => {
             </div>
 
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black text-slate-900 tracking-tight leading-[1.15] mb-6">
-              Shop Thousands of Products From <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-700 via-blue-600 to-indigo-600">Independent Sellers</span>
+              Shop Products From <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-700 via-blue-600 to-indigo-600">Approved Vendors</span>
             </h1>
 
             <p className="text-base sm:text-lg text-slate-600 mb-8 leading-relaxed max-w-2xl mx-auto lg:mx-0">
-              One unified shopping cart across 50+ verified vendors. Purchase consumer electronics, artisanal fashion, and home lifestyle goods directly from certified merchants.
+              Browse live listings with current prices, ratings, and stock. Save products to your wishlist and shop from multiple independent vendors in one cart.
             </p>
 
             {/* CTA Buttons */}
@@ -51,16 +51,16 @@ const HeroBanner = () => {
             {/* Quick Metrics */}
             <div className="grid grid-cols-3 gap-4 pt-6 border-t border-slate-200/80 max-w-lg mx-auto lg:mx-0">
               <div>
-                <div className="text-2xl font-black text-slate-900">50+</div>
-                <div className="text-xs text-slate-500 font-medium">Verified Sellers</div>
+                <div className="text-lg font-black text-slate-900">Approved</div>
+                <div className="text-xs text-slate-500 font-medium">Vendor listings</div>
               </div>
               <div>
-                <div className="text-2xl font-black text-slate-900">10,000+</div>
-                <div className="text-xs text-slate-500 font-medium">Curated Items</div>
+                <div className="text-lg font-black text-slate-900">Live</div>
+                <div className="text-xs text-slate-500 font-medium">Product stock</div>
               </div>
               <div>
-                <div className="text-2xl font-black text-slate-900">4.9 ★</div>
-                <div className="text-xs text-slate-500 font-medium">Buyer Rating</div>
+                <div className="text-lg font-black text-slate-900">Real</div>
+                <div className="text-xs text-slate-500 font-medium">Customer ratings</div>
               </div>
             </div>
 
@@ -78,9 +78,9 @@ const HeroBanner = () => {
                   className="w-full h-full object-cover opacity-90 hover:scale-105 transition-transform duration-700"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent flex flex-col justify-end p-6 text-white">
-                  <span className="text-xs font-bold text-amber-400 uppercase tracking-wider">Trending Marketplace</span>
-                  <h3 className="text-xl font-bold">Festive Lifestyle & Tech Deals</h3>
-                  <p className="text-xs text-slate-300 mt-1">Up to 45% discount across verified partner stores.</p>
+                  <span className="text-xs font-bold text-amber-400 uppercase tracking-wider">MultiCart Marketplace</span>
+                  <h3 className="text-xl font-bold">Discover Independent Stores</h3>
+                  <p className="text-xs text-slate-300 mt-1">Shop products listed by approved vendors.</p>
                 </div>
               </div>
 
@@ -91,7 +91,7 @@ const HeroBanner = () => {
                 </div>
                 <div>
                   <div className="text-xs font-bold text-slate-900">Multi-Vendor Cart</div>
-                  <div className="text-[11px] text-slate-500">Order from Apex + Urban Threads together</div>
+                  <div className="text-[11px] text-slate-500">Keep products from multiple vendors together</div>
                 </div>
               </div>
 

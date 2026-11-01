@@ -8,7 +8,10 @@
     "start": "node server.js",
     "dev": "node --watch server.js",
     "seed": "node src/utils/seedRunner.js",
-    "test": "node test_auth_direct.js"
+    "test": "node test_auth_direct.js",
+    "test:vendor-products": "node test_vendor_products.js",
+    "test:customer-shopping": "node test_customer_shopping.js",
+    "test:orders": "node test_order_flow.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
@@ -16,6 +19,7 @@
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
     "jsonwebtoken": "^9.0.2",
-    "mongoose": "^8.8.4"
+    "mongoose": "^8.8.4",
+    "multer": "^2.5.0"
   }
 }

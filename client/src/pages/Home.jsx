@@ -1,13 +1,49 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, Sparkles, TrendingUp, ShieldCheck, Store, Flame, Award } from 'lucide-react';
+import { ArrowRight, Sparkles, TrendingUp, ShieldCheck, Store, Flame, Award, Package } from 'lucide-react';
 import HeroBanner from '../components/home/HeroBanner';
 import ProductCard from '../components/common/ProductCard';
-import { CATEGORIES, PRODUCTS, VENDORS, TESTIMONIALS } from '../data/mockData';
+import { categoryAPI, productAPI } from '../services/api';
+import { normalizeProduct } from '../utils/product';
 
 const Home = () => {
-  const featuredProducts = PRODUCTS.filter(p => p.isFeatured);
-  const latestProducts = PRODUCTS.filter(p => p.isLatest);
+  const [categories, setCategories] = useState([]);
+  const [featuredProducts, setFeaturedProducts] = useState([]);
+  const [latestProducts, setLatestProducts] = useState([]);
+  const [vendors, setVendors] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [catalogError, setCatalogError] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all([
+      categoryAPI.getAll(),
+      productAPI.getAll({ sort: 'rating', limit: 8 }),
+      productAPI.getAll({ sort: 'newest', limit: 8 })
+    ]).then(([categoryResponse, featuredResponse, latestResponse]) => {
+      if (cancelled) return;
+      const featured = (featuredResponse.products || []).map(normalizeProduct);
+      const latest = (latestResponse.products || []).map(normalizeProduct);
+      setCategories(categoryResponse.categories || []);
+      setFeaturedProducts(featured);
+      setLatestProducts(latest);
+      const seen = new Set();
+      setVendors([...featured, ...latest].filter(product => {
+        if (!product.vendorId || seen.has(product.vendorId)) return false;
+        seen.add(product.vendorId);
+        return true;
+      }).map(product => ({
+        id: product.vendorId,
+        storeName: product.vendorName,
+        storeSlug: product.vendorStoreSlug,
+        storeLogo: product.vendorProfile?.storeLogo || '',
+        verified: product.vendorVerified
+      })).slice(0, 4));
+    }).catch(error => {
+      if (!cancelled) setCatalogError(error.message || 'Marketplace products could not be loaded.');
+    }).finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, []);
 
   return (
     <div className="space-y-16 lg:space-y-24 pb-20">
@@ -37,24 +73,20 @@ const Home = () => {
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 sm:gap-6">
-          {CATEGORIES.map(category => (
+          {categories.map(category => (
             <Link
-              key={category.id}
+              key={category._id}
               to={`/products?category=${category.slug}`}
               className="group relative rounded-2xl overflow-hidden border border-slate-200 bg-white hover:border-blue-400 hover:shadow-lg transition-all text-center flex flex-col p-4"
             >
               <div className="w-20 h-20 sm:w-24 sm:h-24 mx-auto rounded-2xl overflow-hidden mb-3 bg-slate-100">
-                <img
-                  src={category.image}
-                  alt={category.name}
-                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
-                />
+                {category.image ? <img src={category.image} alt={category.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300" /> : <div className="w-full h-full flex items-center justify-center text-slate-300"><Package className="w-9 h-9" /></div>}
               </div>
               <h3 className="text-xs sm:text-sm font-bold text-slate-900 group-hover:text-blue-600 transition-colors line-clamp-1">
-                {category.name}
+                Browse category
               </h3>
               <p className="text-[11px] text-slate-400 font-medium mt-1">
-                {category.itemCount} Items
+                {category.name}
               </p>
             </Link>
           ))}
@@ -74,7 +106,7 @@ const Home = () => {
             </h2>
           </div>
           <Link
-            to="/products?featured=true"
+            to="/products?sort=rating"
             className="inline-flex items-center gap-1.5 text-sm font-bold text-blue-600 hover:text-blue-700 transition-colors group"
           >
             <span>See All Featured</span>
@@ -83,9 +115,10 @@ const Home = () => {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {featuredProducts.map(product => (
+          {featuredProducts.slice(0, 4).map(product => (
             <ProductCard key={product.id} product={product} />
           ))}
+          {!loading && !featuredProducts.length && <p className="col-span-full text-center py-8 text-sm text-slate-500">{catalogError || 'No approved products are currently available.'}</p>}
         </div>
       </section>
 
@@ -143,9 +176,10 @@ const Home = () => {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {latestProducts.map(product => (
+          {latestProducts.slice(0, 4).map(product => (
             <ProductCard key={product.id} product={product} />
           ))}
+          {!loading && !latestProducts.length && <p className="col-span-full text-center py-8 text-sm text-slate-500">{catalogError || 'New products will appear here when approved vendors list them.'}</p>}
         </div>
       </section>
 
@@ -165,23 +199,14 @@ const Home = () => {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {VENDORS.map(vendor => (
+          {vendors.map(vendor => (
             <div
               key={vendor.id}
               className="bg-white rounded-2xl border border-slate-200 p-6 flex flex-col items-center text-center hover:shadow-lg transition-all"
             >
-              <img
-                src={vendor.storeLogo}
-                alt={vendor.name}
-                className="w-20 h-20 rounded-full object-cover ring-4 ring-blue-50 mb-4 shadow-sm"
-              />
-              <h3 className="font-bold text-slate-900 text-base">{vendor.name}</h3>
-              <p className="text-xs text-slate-400 mt-1">{vendor.location}</p>
-              
-              <div className="flex items-center gap-1 text-amber-500 font-bold text-xs mt-3 bg-amber-50 px-3 py-1 rounded-full border border-amber-200">
-                <span>★ {vendor.rating}</span>
-                <span className="text-slate-400 font-normal">({vendor.reviews} reviews)</span>
-              </div>
+              {vendor.storeLogo ? <img src={vendor.storeLogo} alt={vendor.storeName} className="w-20 h-20 rounded-full object-cover ring-4 ring-blue-50 mb-4 shadow-sm" /> : <div className="w-20 h-20 rounded-full bg-blue-50 text-blue-600 mb-4 flex items-center justify-center"><Store className="w-8 h-8" /></div>}
+              <h3 className="font-bold text-slate-900 text-base">{vendor.storeName}</h3>
+              <p className="text-xs text-slate-400 mt-1">{vendor.verified ? 'Verified vendor' : 'Approved vendor'}</p>
 
               <Link
                 to={`/products?vendor=${vendor.id}`}
@@ -191,42 +216,6 @@ const Home = () => {
               </Link>
             </div>
           ))}
-        </div>
-      </section>
-
-      {/* 6. Customer Testimonials */}
-      <section className="bg-slate-100 py-16 border-y border-slate-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center max-w-xl mx-auto mb-12">
-            <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-              Trusted by Shoppers & Sellers
-            </h2>
-            <p className="text-slate-500 text-sm mt-2">
-              See what our community says about MultiCart's unified checkout experience.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {TESTIMONIALS.map(t => (
-              <div key={t.id} className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200 flex flex-col justify-between">
-                <div>
-                  <div className="flex text-amber-400 text-sm mb-4">
-                    {"★".repeat(t.rating)}
-                  </div>
-                  <p className="text-slate-700 text-sm leading-relaxed italic mb-6">
-                    "{t.comment}"
-                  </p>
-                </div>
-                <div className="flex items-center gap-3 pt-4 border-t border-slate-100">
-                  <img src={t.avatar} alt={t.name} className="w-10 h-10 rounded-full object-cover" />
-                  <div>
-                    <h4 className="text-xs font-bold text-slate-900">{t.name}</h4>
-                    <p className="text-[11px] text-slate-400">{t.role} • {t.city}</p>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
         </div>
       </section>
 

@@ -322,6 +322,12 @@ def generate_srs_docx(output_path):
             i += 1
             continue
 
+        # Optional layout marker used to keep an implementation appendix section together.
+        if line.strip().lower() == '<!-- page-break -->':
+            body_elements.append('<w:p><w:r><w:br w:type="page"/></w:r></w:p>')
+            i += 1
+            continue
+
         # Markdown tables
         if line.strip().startswith('|') and '|' in line.strip()[1:]:
             # check if delimiter row
@@ -351,7 +357,7 @@ def generate_srs_docx(output_path):
         elif line.startswith('#### '):
             body_elements.append(f'<w:p><w:pPr><w:pStyle w:val="Heading3"/></w:pPr>{format_inline_text(line[5:].strip())}</w:p>')
         elif line.strip() == '---':
-            body_elements.append('<w:p><w:pPr><w:pBdr><w:bottom w:val="single" w:sz="6" w:space="1" w:color="E2E8F0"/></w:pBdr><w:spacing w:before="120" w:after="120"/></w:p></w:p>')
+            body_elements.append('<w:p><w:pPr><w:pBdr><w:bottom w:val="single" w:sz="6" w:space="1" w:color="E2E8F0"/></w:pBdr><w:spacing w:before="120" w:after="120"/></w:pPr></w:p>')
         elif line.strip().startswith('- ') or line.strip().startswith('* '):
             body_text = line.strip()[2:]
             body_elements.append(f'<w:p><w:pPr><w:ind w:left="400"/><w:spacing w:after="80"/></w:pPr><w:r><w:t xml:space="preserve">•  </w:t></w:r>{format_inline_text(body_text)}</w:p>')

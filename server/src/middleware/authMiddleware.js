@@ -51,3 +51,18 @@ export const protect = async (req, res, next) => {
     });
   }
 };
+
+export const optionalProtect = async (req, res, next) => {
+  const authorization = req.headers.authorization;
+  if (!authorization || !authorization.startsWith('Bearer')) return next();
+  try {
+    const token = authorization.split(' ')[1];
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'multicart_super_secret_jwt_key_2026_final_year_project_secure_token');
+    const user = await getUserModel().findById(decoded.id);
+    if (!user || !user.isActive) return next();
+    req.user = user;
+    next();
+  } catch (error) {
+    return next();
+  }
+};

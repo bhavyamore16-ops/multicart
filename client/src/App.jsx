@@ -9,6 +9,9 @@ import Products from './pages/Products';
 import ProductDetails from './pages/ProductDetails';
 import Categories from './pages/Categories';
 import Cart from './pages/Cart';
+import Wishlist from './pages/Wishlist';
+import Checkout from './pages/Checkout';
+import Orders from './pages/Orders';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import AboutUs from './pages/AboutUs';
@@ -17,6 +20,7 @@ import Profile from './pages/Profile';
 import VendorDashboard from './pages/VendorDashboard';
 import AdminDashboard from './pages/AdminDashboard';
 import { CartProvider } from './context/CartContext';
+import { WishlistProvider } from './context/WishlistContext';
 import { AuthProvider } from './context/AuthContext';
 
 // Scroll to top on route change helper
@@ -32,6 +36,7 @@ function App() {
   return (
     <AuthProvider>
       <CartProvider>
+       <WishlistProvider>
         <Router>
           <ScrollToTop />
           <div className="min-h-screen flex flex-col bg-slate-50 text-slate-800">
@@ -44,6 +49,10 @@ function App() {
                 <Route path="/products/:slug" element={<ProductDetails />} />
                 <Route path="/categories" element={<Categories />} />
                 <Route path="/cart" element={<Cart />} />
+                <Route path="/wishlist" element={<Wishlist />} />
+                <Route path="/checkout" element={<ProtectedRoute allowedRoles={['customer']}><Checkout /></ProtectedRoute>} />
+                <Route path="/orders" element={<ProtectedRoute allowedRoles={['customer', 'vendor', 'admin']}><Orders /></ProtectedRoute>} />
+                <Route path="/orders/:id" element={<ProtectedRoute allowedRoles={['customer', 'vendor', 'admin']}><Orders /></ProtectedRoute>} />
                 <Route path="/login" element={<Login />} />
                 <Route path="/register" element={<Register />} />
                 <Route path="/become-seller" element={<Register />} />
@@ -85,6 +94,7 @@ function App() {
             <NotificationToast />
           </div>
         </Router>
+       </WishlistProvider>
       </CartProvider>
     </AuthProvider>
   );

@@ -1342,9 +1342,9 @@ The project is structured into **8 distinct sequential phases** across a 16-week
 | Weeks  1 -  2 : Phase 1 - Inception, SRS, Architecture & Schema Specification                           |
 | Weeks  3 -  4 : Phase 2 - Backend Foundation, Express Server, MongoDB Schemas & JWT RBAC Auth          |
 | Weeks  5 -  6 : Phase 3 - Vendor Module, Storefront Onboarding & Cloudinary Product Engine              |
-| Weeks  7 -  8 : Phase 4 - Customer Storefront, Dynamic Catalog, Search, Multi-Filter & Cart Engine      |
-| Weeks  9 - 10 : Phase 5 - Multi-Vendor Split-Order Engine & Stripe Payment Gateway Integration          |
-| Weeks 11 - 12 : Phase 6 - Admin Governance Console, Commission Rules, Payout Ledger & Analytics         |
+| Weeks  7 -  8 : Phase 4 - Vendor Dashboard, Product Management & Inventory                                |
+| Weeks  9 - 10 : Phase 5 - Customer Shopping, Catalog, Search, Wishlist & Persistent Cart                  |
+| Weeks 11 - 12 : Phase 6 - Checkout, Split-Order, Payments & Admin Governance                              |
 | Weeks 13 - 14 : Phase 7 - Quality Assurance, Security Hardening, Unit/Integration & Stress Testing     |
 | Weeks 15 - 16 : Phase 8 - Cloud Deployment, Final Documentation, User Manual & Project Defense Prep    |
 +---------------------------------------------------------------------------------------------------------+
@@ -1371,14 +1371,19 @@ The project is structured into **8 distinct sequential phases** across a 16-week
 - Build Product CRUD API with SKU uniqueness checks and inventory tracking.
 - Implement Admin category management endpoints (CRUD categories).
 
-#### Phase 4: Customer Frontend, Catalog Search & Cart Engine (Weeks 7 – 8)
-- Scaffold React Single Page Application with Tailwind CSS and React Router.
-- Build responsive Customer Header, Footer, and Navigation Bar.
-- Develop Product Catalog page with fuzzy search, price range sliders, and category filters.
-- Develop Product Details view with image carousel and vendor store card.
-- Build persistent multi-vendor Shopping Cart with visual vendor grouping.
+#### Phase 4: Vendor Dashboard, Product Management & Inventory (Weeks 7 – 8)
+- Build the vendor dashboard overview with product, order, sales, and recent-order summaries.
+- Provide approved vendors with validated product create, edit, delete, image upload, and availability controls.
+- Enforce vendor ownership on product APIs and provide inventory and sales reporting views.
 
-#### Phase 5: Multi-Vendor Split-Order & Checkout Engine (Weeks 9 – 10)
+#### Phase 5: Customer Shopping, Catalog & Persistent Cart (Weeks 9 – 10)
+- Scaffold the customer-facing React application and responsive navigation.
+- Develop the live product catalog and details view with vendor information, ratings, and stock status.
+- Support product-name search, category and minimum/maximum price filters, and ascending/descending price sorting.
+- Build persistent customer carts and wishlists backed by MongoDB, with guest data merged after login.
+- Validate product approval, availability, and stock for every cart change.
+
+#### Phase 6: Multi-Vendor Split-Order & Checkout Engine (Weeks 11 – 12)
 - Integrate Stripe / Razorpay Sandbox SDK on frontend and backend.
 - Build the core **Split-Order Decomposition Engine**:
   - Accept master cart checkout.
@@ -1387,7 +1392,7 @@ The project is structured into **8 distinct sequential phases** across a 16-week
   - Decrement inventory counts atomically.
 - Develop Customer Order History and Vendor-by-Vendor Tracking Timeline.
 
-#### Phase 6: Admin Governance & Financial Management (Weeks 11 – 12)
+#### Phase 6 (continued): Admin Governance & Financial Management
 - Develop Admin Governance Dashboard with KPI metric cards.
 - Implement Vendor Approval Queue (Approve, Reject, Suspend).
 - Implement Commission rate configuration and automatic deduction logic.
@@ -1509,4 +1514,423 @@ MultiCart/
 
 ---
 
+
+---
+
 *End of Software Requirements Specification (SRS) Document.*
+
+---
+
+## PHASE 4 ADDENDUM: Vendor Dashboard & Product Management
+
+**Document Version:** 1.1.0  
+**Date:** November 2026  
+**Status:** Implemented & Tested
+
+---
+
+### A. Vendor Dashboard Overview
+
+The Vendor Dashboard (`/vendor/dashboard`) is a protected single-page panel accessible exclusively to users with `role: 'vendor'`. It features five tabs:
+
+| Tab | Description |
+|---|---|
+| **Overview** | KPI cards, revenue summary, recent orders, store profile |
+| **My Products** | Searchable table of vendor's own products with inline CRUD actions |
+| **Inventory** | Products sorted by stock level (low-first), with stock status badges |
+| **Add Product** | Product creation/edit form with file upload and URL input modes |
+| **Sales Reports** | Monthly revenue bar chart, order summary, top performing products |
+
+**Access Control:**
+- Only users with `role: 'vendor'` can access the route (enforced by `ProtectedRoute`).
+- Tabs other than Overview are disabled until vendor status is `approved`.
+- Vendors with `pending`, `rejected`, or `suspended` status see appropriate banners.
+
+---
+
+### B. Product Management — Business Rules
+
+| Rule | Implementation |
+|---|---|
+| Vendors can only manage their own products | `updateProduct` and `deleteProduct` compare the stored product owner with the authenticated user ID |
+| Cross-vendor editing is forbidden | Returns `403 Forbidden` if ownership check fails |
+| Only approved vendors can manage products and images | `requireApprovedVendor` checks the current `VendorProfile.status` on each product and upload request |
+| Products are persisted in MongoDB | The `Product` Mongoose model stores product records in the `products` collection when the configured MongoDB connection is active |
+| Product fields are validated on create and update | The API validates names, descriptions, positive INR prices, integer stock, discounts, active categories, image references, tags, specifications, and availability values |
+| Images can be uploaded as files or URLs | `POST /api/vendor/upload` accepts JPEG, PNG, WebP, GIF, or AVIF files up to 5 MB; product forms may also store HTTP(S) image URLs |
+
+---
+
+### C. Vendor Dashboard API Endpoints
+
+#### Base URL: `http://localhost:5000/api/vendor`
+
+All endpoints require:
+- `Authorization: Bearer <JWT>` header
+- User `role === 'vendor'`
+- Routes marked ✅ additionally require `VendorProfile.status === 'approved'`
+
+| Method | Endpoint | Auth | Description |
+|---|---|---|---|
+| `GET` | `/profile` | Vendor | Get current vendor's profile |
+| `PUT` | `/profile` | Vendor | Update store description, logo, banner, phone, address |
+| `GET` | `/stats` | ✅ Approved | Dashboard KPIs: products, orders, revenue, stock alerts |
+| `GET` | `/sales-report` | ✅ Approved | Monthly revenue chart data + top products |
+| `POST` | `/upload` | ✅ Approved | Upload product image (multipart/form-data, field: `image`) |
+| `GET` | `/products` | ✅ Approved | List all products belonging to authenticated vendor |
+| `POST` | `/products` | ✅ Approved | Create new product |
+| `PUT` | `/products/:id` | ✅ Approved | Update vendor's own product (ownership verified) |
+| `DELETE` | `/products/:id` | ✅ Approved | Delete vendor's own product (ownership verified) |
+
+`GET /products` returns the authenticated vendor's product records with category details and per-product sales totals. `GET /stats` returns product and inventory counts, total order count, units sold, revenue, withdrawable balance, commission rate, and up to five recent vendor-specific order summaries. A recent order summary reports the vendor's item subtotal and quantity, not the full multi-vendor order total.
+
+---
+
+### D. Product CRUD — Request & Response Specs
+
+#### POST `/api/vendor/products` — Create Product
+
+**Request Body:**
+```json
+{
+  "name":             "Sony WH-1000XM5 Headphones",
+  "description":      "Industry-leading noise cancelling wireless headphones...",
+  "shortDescription": "Best-in-class ANC with 30h battery",
+  "price":            29990,
+  "discountPercent":  15,
+  "stock":            45,
+  "category":         "64abc123...",
+  "images":           ["https://...", "https://..."],
+  "thumbnail":        "https://...",
+  "isAvailable":      true,
+  "tags":             ["wireless", "sony", "noise-cancelling"]
+}
+```
+
+**Validation Rules:**
+- `name`: required, string, max 200 chars
+- `description`: required, string, max 3000 chars
+- `price`: required, finite number greater than 0, in INR
+- `stock`: required, whole number ≥ 0
+- `category`: required reference to an active category in MongoDB
+- `discountPercent`: optional, 0–100
+- `shortDescription`: optional, max 300 characters
+- `images` / `thumbnail`: HTTP(S) image URLs or uploaded `/uploads/` URLs; at most 10 images
+- `isAvailable`: optional boolean (or the string `true` / `false`)
+- `tags`: optional array of up to 30 strings, max 40 characters each
+
+**Success Response (201):**
+```json
+{
+  "success": true,
+  "message": "Product created successfully.",
+  "product": { "_id": "...", "name": "...", "slug": "sony-wh-1000xm5-headphones", ... }
+}
+```
+
+---
+
+#### PUT `/api/vendor/products/:id` — Update Product
+
+- Only fields in the allowed list are patched: `name`, `description`, `shortDescription`, `price`, `discountPercent`, `stock`, `category`, `images`, `thumbnail`, `isAvailable`, `tags`, `specifications`. The resulting full product is validated before it is saved.
+- Ownership check: `product.vendor !== req.user._id` → `403`
+
+**Error Responses:**
+- `404` — Product not found
+- `403` — Unauthorized (not your product)
+- `400` — Validation error
+
+---
+
+#### DELETE `/api/vendor/products/:id` — Delete Product
+
+- Performs hard delete from MongoDB
+- Ownership verified before deletion
+
+---
+
+#### POST `/api/vendor/upload` — Image Upload
+
+- **Content-Type:** `multipart/form-data`
+- **Field name:** `image`
+- **Allowed types:** JPEG, PNG, WebP, GIF, AVIF
+- **Max size:** 5 MB
+- Files saved under `server/uploads/` with a generated filename and an extension derived from the accepted image MIME type
+- Served as static assets at `http://localhost:5000/uploads/<filename>`
+
+**Success Response (200):**
+```json
+{
+  "success": true,
+  "message": "Image uploaded successfully.",
+  "imageUrl": "http://localhost:5000/uploads/1735000000000-a1b2c3d4e5f67890.jpg",
+  "filename": "1735000000000-a1b2c3d4e5f67890.jpg",
+  "size": 245678
+}
+```
+
+---
+
+#### GET `/api/vendor/sales-report` — Sales Report
+
+Returns revenue and order totals from actual order line items belonging to the authenticated vendor, plus six monthly buckets and the vendor's top products by units sold. Cancelled, refunded, and failed-payment orders are excluded from revenue. Empty periods return zero values; the report does not generate sample sales.
+
+**Response:**
+```json
+{
+  "success": true,
+  "report": {
+    "totalRevenue": 450000,
+    "totalOrders": 87,
+    "avgOrderValue": 5172,
+    "monthlyData": [
+      { "month": "Jun 2026", "revenue": 68000, "orders": 14 },
+      { "month": "Jul 2026", "revenue": 92000, "orders": 19 }
+    ],
+    "topProducts": [
+      {
+        "_id": "...", "name": "Apple AirPods Pro",
+        "totalSales": 154, "revenue": 3522600
+      }
+    ]
+  }
+}
+```
+
+---
+
+### E. Database Specifications — Phase 4
+
+#### Product Collection (`products`)
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `_id` | ObjectId | Auto | Unique product ID |
+| `name` | String | ✅ | Product name (max 200 chars) |
+| `slug` | String | Auto | URL-friendly unique identifier (auto-generated) |
+| `description` | String | ✅ | Full product description (max 3000 chars) |
+| `shortDescription` | String | — | Short summary (max 300 chars) |
+| `price` | Number | ✅ | Base price in INR (> 0) |
+| `discountPercent` | Number | — | Discount percentage (0–100, default: 0) |
+| `stock` | Number | ✅ | Whole-number quantity in stock (≥ 0) |
+| `category` | ObjectId | ✅ | Reference to `categories` collection |
+| `vendor` | ObjectId | ✅ | Reference to `users` collection (owner) |
+| `vendorProfile` | ObjectId | — | Reference to `vendorprofiles` collection |
+| `images` | [String] | — | Up to 10 HTTP(S) or uploaded image URLs |
+| `thumbnail` | String | — | Primary display image URL |
+| `isAvailable` | Boolean | — | Listed on marketplace (default: true) |
+| `isApproved` | Boolean | — | Admin-approved (default: true for approved vendors) |
+| `rating.average` | Number | — | Average customer rating (0–5) |
+| `rating.count` | Number | — | Total number of ratings |
+| `totalSales` | Number | — | Cumulative units sold |
+| `tags` | [String] | — | Search and filter tags |
+| `specifications` | Map | — | Key-value specification pairs |
+| `createdAt` | Date | Auto | Timestamp |
+| `updatedAt` | Date | Auto | Timestamp |
+
+**Virtual field:** `discountedPrice` = `price × (1 - discountPercent / 100)`
+
+---
+
+#### Order Collection (`orders`) — Phase 4 Stub
+
+| Field | Type | Description |
+|---|---|---|
+| `_id` | ObjectId | Unique order ID |
+| `orderNumber` | String | Human-readable order number (auto: `MC-XXXXX-NNNN`) |
+| `customer` | ObjectId | Reference to `users` (buyer) |
+| `items` | Array | Order line items (see below) |
+| `items[].product` | ObjectId | Product reference |
+| `items[].vendor` | ObjectId | Vendor reference (enables per-vendor filtering) |
+| `items[].name` | String | Product name snapshot |
+| `items[].price` | Number | Unit price at time of order |
+| `items[].quantity` | Number | Quantity ordered |
+| `items[].subtotal` | Number | `price × quantity` |
+| `subtotal` | Number | Order subtotal |
+| `shippingCost` | Number | Shipping fee |
+| `total` | Number | Grand total |
+| `status` | String | `pending` / `confirmed` / `processing` / `shipped` / `delivered` / `cancelled` / `refunded` |
+| `paymentStatus` | String | `pending` / `paid` / `failed` / `refunded` |
+| `paymentMethod` | String | `cod` / `upi` / `card` / `netbanking` / `wallet` |
+| `shippingAddress` | Object | Delivery address snapshot |
+| `createdAt` | Date | Order placement timestamp |
+
+> **Note:** Checkout, payment, and fulfilment are scheduled for the phase after customer shopping. The Order model exists in Phase 4 to enable vendor stats and sales reports.
+
+---
+
+### F. Inventory Management
+
+The Inventory tab displays all vendor products sorted by `stock` (ascending — most critical first).
+
+**Stock Status Classifications:**
+
+| Status | Condition | Badge Color |
+|---|---|---|
+| Out of Stock | `stock === 0` | 🔴 Red |
+| Low Stock | `0 < stock ≤ 5` | 🟡 Amber |
+| In Stock | `stock > 5` | 🟢 Green |
+
+**Features:**
+- Summary pill counts for each status category
+- Quick "Update Stock" link opens the Edit Product form for that product
+- Sortable by stock level (always low-first for urgency)
+
+---
+
+### G. Sales Reports
+
+The Sales Reports tab provides business intelligence for approved vendors:
+
+**Components:**
+1. **Summary Cards** — Total Revenue, Total Orders, Average Order Value
+2. **Monthly Revenue Chart** — SVG bar chart for the last 6 months
+3. **Monthly Data Table** — Revenue, orders, avg/order, and relative % share per month
+4. **Top 5 Products** — Ranked by `totalSales`, showing revenue contribution
+
+**Data Source:**
+- Revenue and order counts are calculated from persisted order line items associated with this vendor. Cancelled, refunded, and failed-payment orders are omitted from revenue.
+- Top products are ranked by each product's persisted `totalSales` value.
+- The report shows the most recent six calendar months, including zero-value months when no orders exist.
+
+---
+
+### H. Image Upload Architecture
+
+```
+Client (Browser)
+    │  FormData { image: File }
+    ▼
+POST /api/vendor/upload
+    │  multer middleware (disk storage, 5MB limit, image MIME validation)
+    ▼
+server/uploads/<timestamp>-<filename>
+    │  Saved to disk
+    ▼
+Response: { imageUrl: "http://localhost:5000/uploads/<filename>" }
+    │
+    ▼
+Client stores URL → sent as `thumbnail` / `images[]` in product create/update
+```
+
+**Frontend ImageUpload Component:**
+- Toggle between **Upload File** (file picker) and **Image URL** (text input) modes
+- Live preview thumbnail shown after a successful upload
+- An upload failure is shown to the vendor; a browser blob URL is never saved as a product image
+- Remove button clears selection
+
+---
+
+### I. Vendor Permission Matrix
+
+| Action | Customer | Vendor (Pending) | Vendor (Approved) | Admin |
+|---|---|---|---|---|
+| View product listings | ✅ | ✅ | ✅ | ✅ |
+| Access vendor dashboard | ❌ | ✅ (Overview only) | ✅ (All tabs) | ❌ |
+| Create products | ❌ | ❌ | ✅ | ✅ |
+| Edit own products | ❌ | ❌ | ✅ | ✅ |
+| Edit another vendor's products | ❌ | ❌ | ❌ | ✅ |
+| Delete own products | ❌ | ❌ | ✅ | ✅ |
+| Upload product images | ❌ | ❌ | ✅ | ✅ |
+| View inventory | ❌ | ❌ | ✅ | ✅ |
+| View sales reports | ❌ | ❌ | ✅ | ✅ |
+| Approve/reject vendors | ❌ | ❌ | ❌ | ✅ |
+
+---
+
+*End of Phase 4 Addendum.*
+
+---
+
+## Phase 5 Addendum — Customer Shopping
+
+This addendum records the customer-facing catalog, cart, and wishlist behavior implemented in Phase 5. Product, category, rating, stock, and vendor information is read from the configured MongoDB collections. The in-memory adapters are used only when MongoDB is disconnected.
+
+### A. Product Browsing, Search, and Filters
+
+- The catalog returns products marked approved from vendor profiles whose current status is `approved`. Delisted products (`isAvailable: false`) are excluded. Approved products with zero stock remain visible and are labeled unavailable.
+- Search matches product names case-insensitively. It does not substitute local sample products when the API is empty or unavailable.
+- Category filtering accepts an active category slug or identifier. Minimum and maximum price filters can be combined; invalid or reversed ranges return `400`.
+- Sort options include newest, highest rated, price low-to-high, and price high-to-low. Results include a `total`, current `page`, and `pages` value; page size is capped at 100.
+- Catalog cards show the current discounted price, original price when discounted, persisted average rating and rating count, vendor store name, and available stock.
+- The details page resolves by product slug or ID and shows the product image gallery, description, specifications, category, vendor store name and verification status, rating aggregate, current price, and stock. Direct details requests hide unapproved products and products whose vendor is not approved. A zero-stock or disabled product may be viewed but cannot be added to the cart.
+
+#### Catalog API
+
+| Method | Endpoint | Access | Behavior |
+|---|---|---|---|
+| `GET` | `/api/products` | Public | List approved-vendor, active listings with pagination and filters |
+| `GET` | `/api/products/:idOrSlug` | Public | Product details with category and vendor information |
+| `GET` | `/api/categories` | Public | Active category list used by browse filters |
+
+`GET /api/products` accepts `search` (or `q`), `category`, `vendor`, `minPrice`, `maxPrice`, `minRating`, `sort`, `page`, and `limit`. Supported price sort values are `price_asc` and `price_desc`.
+
+### B. Shopping Cart
+
+- Authenticated customers have one saved cart per account in MongoDB. A cart line stores only the product reference and whole-number quantity; product name, current discounted unit price, vendor, image, stock, and line total are resolved from current product data when the cart is read.
+- Guest carts are kept in browser local storage. After customer authentication, guest items are merged into the account cart; invalid, unavailable, or over-stock lines are rejected and reported.
+- Adding or increasing a quantity rechecks current vendor approval, product approval, availability, and stock on the server. A request that would exceed stock returns `409` and does not change the cart.
+- Decreasing a quantity is supported; setting quantity to zero removes the line. Customers may remove a line or clear the cart at any time.
+- The server returns the current subtotal, shipping fee, and total. Subtotal uses the current discounted product price. Shipping is ₹150 when the subtotal is greater than zero and at most ₹1,999, otherwise free.
+- Before the cart can proceed, the customer availability check verifies every current line against vendor approval, product availability, and stock. It returns `409` if an item can no longer be purchased. Checkout and payment processing are outside this phase.
+
+#### Cart API
+
+All cart routes require a valid customer token; vendor, administrator, and anonymous requests are rejected.
+
+| Method | Endpoint | Behavior |
+|---|---|---|
+| `GET` | `/api/cart` | Read the account cart and current line details/totals |
+| `POST` | `/api/cart/items` | Add `{ "productId": "…", "quantity": 1 }` after stock checks |
+| `PATCH` | `/api/cart/items/:productId` | Set `{ "quantity": n }`; zero removes the line |
+| `DELETE` | `/api/cart/items/:productId` | Remove a cart line |
+| `DELETE` | `/api/cart` | Clear the account cart |
+| `POST` | `/api/cart/merge` | Merge guest `{ "items": [{ "productId": "…", "quantity": 1 }] }` |
+| `POST` | `/api/cart/validate` | Recheck all saved lines before any checkout action |
+
+Invalid input returns `400`, missing authentication returns `401`, wrong role returns `403`, missing products return `404`, and stock or availability conflicts return `409`.
+
+### C. Wishlist
+
+- Authenticated customers have one MongoDB wishlist per account. The wishlist stores product references and prevents duplicate entries.
+- Guest wishlists are kept in browser local storage and are merged into the account wishlist after customer authentication.
+- Approved-vendor products can be saved even if out of stock; the product card continues to show the current stock state. Products from unapproved vendors are omitted from wishlist reads.
+
+#### Wishlist API
+
+| Method | Endpoint | Access | Behavior |
+|---|---|---|---|
+| `GET` | `/api/wishlist` | Customer | Return the customer's saved products |
+| `POST` | `/api/wishlist/items` | Customer | Add `{ "productId": "…" }`; duplicate adds are idempotent |
+| `DELETE` | `/api/wishlist/items/:productId` | Customer | Remove the saved product |
+
+<!-- page-break -->
+
+### D. Shopping Collections
+
+#### Cart Collection (`carts`)
+
+| Field | Type | Rules |
+|---|---|---|
+| `_id` | ObjectId | MongoDB document ID |
+| `customer` | ObjectId → `users` | Required; unique index, one cart per customer |
+| `items[].product` | ObjectId → `products` | Required product reference |
+| `items[].quantity` | Number | Required positive integer; checked against current product stock on write |
+| `createdAt`, `updatedAt` | Date | Mongoose timestamps |
+
+#### Wishlist Collection (`wishlists`)
+
+| Field | Type | Rules |
+|---|---|---|
+| `_id` | ObjectId | MongoDB document ID |
+| `customer` | ObjectId → `users` | Required; unique index, one wishlist per customer |
+| `products[]` | ObjectId → `products` | Product references; duplicates are removed by the API |
+| `createdAt`, `updatedAt` | Date | Mongoose timestamps |
+
+The product collection's existing fields `isApproved`, `isAvailable`, `stock`, `price`, `discountPercent`, `rating`, `vendor`, `vendorProfile`, and `category` drive the customer catalog and availability decisions. The vendor profile's current `status` is checked for every public listing and cart write/validation.
+
+### E. Phase 5 Verification
+
+`npm run test:customer-shopping` exercises catalog visibility, name search, category and price filtering, both price sorts, product details, rating and stock data, customer-only API access, cart persistence and totals, stock/availability rejection, guest-cart merge, cart validation, wishlist add/remove/deduplication, and customer data isolation. The suite runs against the explicit in-memory adapter when a live MongoDB connection is not configured.
+
+*End of Phase 5 Addendum.*

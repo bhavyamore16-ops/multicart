@@ -189,8 +189,7 @@ export const AuthProvider = ({ children }) => {
       setUser(data.user);
       return { success: true, message: data.message };
     } catch (error) {
-      setUser(prev => ({ ...prev, ...updates }));
-      return { success: true, message: 'Profile updated successfully!' };
+      return { success: false, message: error.message || 'Profile update failed.' };
     } finally {
       setLoading(false);
     }
@@ -206,7 +205,7 @@ export const AuthProvider = ({ children }) => {
       });
       return { success: true, message: data.message };
     } catch (error) {
-      return { success: true, message: 'Password updated successfully!' };
+      return { success: false, message: error.message || 'Password update failed.' };
     } finally {
       setLoading(false);
     }
